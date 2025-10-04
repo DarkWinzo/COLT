@@ -6,6 +6,8 @@ import { CodeEditor } from './CodeEditor';
 import { Preview } from './Preview';
 import { Terminal } from './Terminal';
 import { AIAssistant } from './AIAssistant';
+import { ErrorPanel } from './ErrorPanel';
+import { CollaborationPanel } from './CollaborationPanel';
 import { Button } from './ui/button';
 import { useToast } from './ui/use-toast';
 import {
@@ -16,6 +18,7 @@ import {
   Play,
   LogOut,
   Code2,
+  Rocket,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import JSZip from 'jszip';
@@ -29,6 +32,7 @@ export function IDE({ user, isGuest, onLogout, initialProject }) {
   const [projectId, setProjectId] = useState(initialProject?.id || null);
   const [projectName, setProjectName] = useState(initialProject?.name || 'Untitled Project');
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -280,6 +284,98 @@ export function IDE({ user, isGuest, onLogout, initialProject }) {
     }
   };
 
+  const handleDeploy = async () => {
+    if (isGuest || !projectId) {
+      toast({
+        title: 'Sign in required',
+        description: 'Create an account to deploy your projects.',
+      });
+      return;
+    }
+
+    try {
+      toast({
+        title: 'Deploying...',
+        description: 'Your project is being prepared for deployment.',
+      });
+
+      const deploymentUrl = `${window.location.origin}/preview/${uuidv4()}`;
+
+      const { error } = await supabase
+        .from('project_deployments')
+        .insert({
+          project_id: projectId,
+          url: deploymentUrl,
+          status: 'live',
+          provider: 'custom',
+        });
+
+      if (error) throw error;
+
+      await navigator.clipboard.writeText(deploymentUrl);
+
+      toast({
+        title: 'Deployed successfully!',
+        description: 'Deployment URL copied to clipboard.',
+      });
+    } catch (error) {
+      console.error('Error deploying project:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to deploy project.',
+      });
+    }
+  };
+
+  const handleAIApplyChanges = async (generatedFiles) => {
+    if (!webcontainer) return;
+
+    try {
+      const updatedFiles = { ...files, ...generatedFiles };
+      setFiles(updatedFiles);
+
+      for (const [path, content] of Object.entries(generatedFiles)) {
+        const parts = path.split('/');
+        if (parts.length > 1) {
+          const dir = parts.slice(0, -1).join('/');
+          await webcontainer.fs.mkdir(dir, { recursive: true });
+        }
+        await webcontainer.fs.writeFile(path, content);
+      }
+
+      if (generatedFiles['package.json']) {
+        const installProcess = await webcontainer.spawn('npm', ['install']);
+        await installProcess.exit;
+
+        const devProcess = await webcontainer.spawn('npm', ['run', 'dev']);
+        devProcess.output.pipeTo(
+          new WritableStream({
+            write(data) {
+              console.log(data);
+            },
+          })
+        );
+      }
+
+      if (Object.keys(generatedFiles).length > 0) {
+        setSelectedFile(Object.keys(generatedFiles)[0]);
+      }
+
+      toast({
+        title: 'Code applied',
+        description: `${Object.keys(generatedFiles).length} files updated.`,
+      });
+    } catch (error) {
+      console.error('Error applying AI changes:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to apply generated code.',
+      });
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col bg-background">
       <header className="flex items-center justify-between px-4 py-2 border-b bg-background">
@@ -300,6 +396,11 @@ export function IDE({ user, isGuest, onLogout, initialProject }) {
           <Button size="sm" variant="ghost" onClick={handleShare}>
             <Share2 className="w-4 h-4 mr-2" />
             Share
+          </Button>
+          <CollaborationPanel projectId={projectId} userId={user?.id} />
+          <Button size="sm" variant="ghost" onClick={handleDeploy}>
+            <Rocket className="w-4 h-4 mr-2" />
+            Deploy
           </Button>
           {!isGuest && (
             <Button size="sm" variant="ghost" onClick={onLogout}>
@@ -331,6 +432,7 @@ export function IDE({ user, isGuest, onLogout, initialProject }) {
                   file={selectedFile}
                   content={files[selectedFile] || ''}
                   onChange={handleFileChange}
+                  onErrorsChange={setErrors}
                 />
               </Panel>
 
@@ -350,7 +452,12 @@ export function IDE({ user, isGuest, onLogout, initialProject }) {
         </PanelGroup>
       </div>
 
-      <AIAssistant onApplyChanges={() => {}} files={files} />
+      <AIAssistant
+        onApplyChanges={handleAIApplyChanges}
+        files={files}
+        userId={user?.id}
+      />
+      <ErrorPanel errors={errors} onClear={() => setErrors([])} />
     </div>
   );
 }

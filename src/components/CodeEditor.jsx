@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 
-export function CodeEditor({ file, content, onChange, theme = 'vs-dark' }) {
+export function CodeEditor({ file, content, onChange, onErrorsChange, theme = 'vs-dark' }) {
   const editorRef = useRef(null);
+  const monacoRef = useRef(null);
 
   const handleEditorDidMount = (editor, monaco) => {
     editorRef.current = editor;
+    monacoRef.current = monaco;
 
     monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
       noSemanticValidation: false,
@@ -24,6 +26,29 @@ export function CodeEditor({ file, content, onChange, theme = 'vs-dark' }) {
       allowJs: true,
       typeRoots: ['node_modules/@types'],
     });
+
+    const updateMarkers = () => {
+      if (!editor || !onErrorsChange) return;
+
+      const model = editor.getModel();
+      if (!model) return;
+
+      const markers = monaco.editor.getModelMarkers({ resource: model.uri });
+      const errors = markers.map(marker => ({
+        type: marker.severity === monaco.MarkerSeverity.Error ? 'error' : 'warning',
+        message: marker.message,
+        line: marker.startLineNumber,
+        file: file || 'unknown',
+      }));
+
+      onErrorsChange?.(errors);
+    };
+
+    editor.onDidChangeModelDecorations(() => {
+      updateMarkers();
+    });
+
+    setTimeout(updateMarkers, 500);
   };
 
   const getLanguage = (filename) => {
@@ -71,6 +96,11 @@ export function CodeEditor({ file, content, onChange, theme = 'vs-dark' }) {
         wordWrap: 'on',
         formatOnPaste: true,
         formatOnType: true,
+        quickSuggestions: true,
+        suggestOnTriggerCharacters: true,
+        parameterHints: { enabled: true },
+        autoClosingBrackets: 'always',
+        autoClosingQuotes: 'always',
       }}
     />
   );

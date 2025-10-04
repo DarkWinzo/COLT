@@ -332,7 +332,7 @@ app.listen(PORT, () => {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
 }
 
 #app {
@@ -354,16 +354,16 @@ button {
   padding: 0.8em 1.5em;
   font-size: 1em;
   font-weight: 500;
-  background-color: #667eea;
+  background-color: #2563eb;
   color: white;
   cursor: pointer;
   transition: all 0.25s;
 }
 
 button:hover {
-  background-color: #5568d3;
+  background-color: #1d4ed8;
   transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 5px 15px rgba(37, 99, 235, 0.4);
 }`,
       'main.js': `let count = 0;
 const button = document.getElementById('counter');
@@ -374,6 +374,103 @@ button.addEventListener('click', () => {
 });
 
 console.log('App initialized!');`
+    }
+  },
+
+  svelte: {
+    name: 'Svelte + Vite',
+    description: 'Svelte with Vite',
+    files: {
+      'package.json': JSON.stringify({
+        name: 'svelte-app',
+        private: true,
+        version: '0.0.0',
+        type: 'module',
+        scripts: {
+          dev: 'vite',
+          build: 'vite build',
+          preview: 'vite preview'
+        },
+        dependencies: {
+          svelte: '^4.2.8'
+        },
+        devDependencies: {
+          '@sveltejs/vite-plugin-svelte': '^3.0.1',
+          vite: '^5.1.0'
+        }
+      }, null, 2),
+      'index.html': `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Svelte App</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>`,
+      'vite.config.js': `import { defineConfig } from 'vite'
+import { svelte } from '@sveltejs/vite-plugin-svelte'
+
+export default defineConfig({
+  plugins: [svelte()],
+})`,
+      'src/main.js': `import './app.css'
+import App from './App.svelte'
+
+const app = new App({
+  target: document.getElementById('app'),
+})
+
+export default app`,
+      'src/App.svelte': `<script>
+  let count = 0
+</script>
+
+<main>
+  <h1>Welcome to Svelte</h1>
+  <div class="card">
+    <button on:click={() => count++}>
+      count is {count}
+    </button>
+    <p>Edit <code>src/App.svelte</code> to test HMR</p>
+  </div>
+</main>
+
+<style>
+  main {
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .card {
+    padding: 2em;
+  }
+
+  button {
+    border-radius: 8px;
+    border: 1px solid transparent;
+    padding: 0.6em 1.2em;
+    font-size: 1em;
+    font-weight: 500;
+    background-color: #ff3e00;
+    color: white;
+    cursor: pointer;
+    transition: border-color 0.25s;
+  }
+
+  button:hover {
+    border-color: #ff3e00;
+  }
+</style>`,
+      'src/app.css': `body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+}`
     }
   }
 };
