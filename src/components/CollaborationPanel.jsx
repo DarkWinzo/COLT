@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, UserPlus, X, Mail, Shield, Eye, Edit } from 'lucide-react';
+import { Users, UserPlus, X, Mail, Shield, Eye, CreditCard as Edit } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import {
