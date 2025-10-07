@@ -24,16 +24,20 @@ export function AIAssistant({ onApplyChanges, files, userId, currentFile, curren
   }, [messages]);
 
   const quickActions = [
-    { icon: Bug, label: 'Find bugs', prompt: 'Analyze the current code for potential bugs and issues' },
-    { icon: Zap, label: 'Optimize', prompt: 'Optimize this code for better performance' },
-    { icon: FileCode, label: 'Refactor', prompt: 'Refactor this code to improve readability and maintainability' },
-    { icon: Lightbulb, label: 'Explain', prompt: 'Explain what this code does in detail' },
+    { icon: Bug, label: 'Find bugs', prompt: 'Perform deep code analysis to find bugs, edge cases, logic errors, and potential runtime issues', mode: 'analysis' },
+    { icon: Zap, label: 'Optimize', prompt: 'Analyze performance bottlenecks and optimize for speed, memory, and bundle size', mode: 'analysis' },
+    { icon: FileCode, label: 'Refactor', prompt: 'Refactor this code using best practices, design patterns, and clean architecture principles' },
+    { icon: Lightbulb, label: 'Explain', prompt: 'Provide comprehensive explanation of this code including architecture, patterns, and logic flow', mode: 'analysis' },
+    { icon: Code2, label: 'Add tests', prompt: 'Generate comprehensive unit and integration tests with edge case coverage' },
+    { icon: Brain, label: 'Security', prompt: 'Perform security audit checking for XSS, injection risks, exposed secrets, and vulnerabilities', mode: 'analysis' },
   ];
 
-  const handleSubmit = async (e, customPrompt = null) => {
+  const handleSubmit = async (e, customPrompt = null, forceMode = null) => {
     e?.preventDefault();
     const finalPrompt = customPrompt || prompt;
     if (!finalPrompt.trim() || loading) return;
+
+    const shouldAnalyze = forceMode === 'analysis' || analysisMode;
 
     let enhancedPrompt = finalPrompt;
     if (contextAware && currentFile && currentCode) {
@@ -59,7 +63,7 @@ export function AIAssistant({ onApplyChanges, files, userId, currentFile, curren
         body: JSON.stringify({
           prompt: enhancedPrompt,
           existingFiles: files,
-          analysisMode: analysisMode,
+          analysisMode: shouldAnalyze,
           context: contextAware ? { currentFile, currentCode } : null,
         }),
       });
@@ -70,17 +74,26 @@ export function AIAssistant({ onApplyChanges, files, userId, currentFile, curren
 
       const result = await response.json();
 
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
       const assistantMessage = {
         role: 'assistant',
-        content: result.description || 'Generated your project successfully!',
+        content: result.description || result.analysis || 'Task completed successfully!',
         files: result.files,
-        isDemo: result.demo,
-        analysis: result.analysis
+        analysis: result.analysis,
+        issues: result.issues,
+        score: result.score,
+        suggestions: result.suggestions,
+        dependencies: result.dependencies,
+        breaking_changes: result.breaking_changes,
+        next_steps: result.next_steps,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
 
-      if (result.files && onApplyChanges && !analysisMode) {
+      if (result.files && onApplyChanges && !shouldAnalyze) {
         onApplyChanges(result.files);
       }
 
@@ -93,12 +106,10 @@ export function AIAssistant({ onApplyChanges, files, userId, currentFile, curren
       }
 
       toast({
-        title: result.demo ? 'Demo Code Generated' : analysisMode ? 'Analysis Complete' : 'Code Generated',
-        description: result.demo
-          ? 'Demo project created. Add ANTHROPIC_API_KEY for AI generation.'
-          : analysisMode
-          ? 'Code analysis completed successfully!'
-          : 'Your code has been generated and applied!',
+        title: shouldAnalyze ? 'Analysis Complete' : 'Code Generated',
+        description: shouldAnalyze
+          ? `Analysis complete. ${result.issues?.length || 0} issues found.`
+          : `${Object.keys(result.files || {}).length} files ${existingFiles && Object.keys(existingFiles).length > 0 ? 'updated' : 'generated'}.`,
       });
     } catch (error) {
       console.error('AI generation error:', error);
@@ -217,15 +228,15 @@ export function AIAssistant({ onApplyChanges, files, userId, currentFile, curren
 
             <div className="mb-4">
               <p className="text-xs font-semibold mb-2">Quick Actions</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {quickActions.map((action) => (
                   <Button
                     key={action.label}
                     size="sm"
                     variant="outline"
-                    onClick={(e) => handleSubmit(e, action.prompt)}
+                    onClick={(e) => handleSubmit(e, action.prompt, action.mode)}
                     disabled={!currentFile || loading}
-                    className="h-auto py-2 px-3 flex flex-col items-center gap-1 text-xs"
+                    className="h-auto py-2 px-2 flex flex-col items-center gap-1 text-xs"
                   >
                     <action.icon className="w-4 h-4" />
                     {action.label}
@@ -273,7 +284,81 @@ export function AIAssistant({ onApplyChanges, files, userId, currentFile, curren
                         <Lightbulb className="w-3 h-3" />
                         Analysis:
                       </p>
-                      <p className="text-xs opacity-90">{msg.analysis}</p>
+                      <p className="text-xs opacity-90 whitespace-pre-wrap">{msg.analysis}</p>
+                    </div>
+                  )}
+                  {msg.issues && msg.issues.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-border/50">
+                      <p className="text-xs font-semibold mb-1 flex items-center gap-1">
+                        <Bug className="w-3 h-3" />
+                        Issues Found: {msg.issues.length}
+                      </p>
+                      <div className="space-y-1 max-h-40 overflow-y-auto">
+                        {msg.issues.slice(0, 5).map((issue, i) => (
+                          <div key={i} className="text-xs p-2 bg-background/50 rounded">
+                            <div className="flex items-center gap-1 mb-1">
+                              <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${
+                                issue.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
+                                issue.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                                issue.severity === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                                'bg-blue-500/20 text-blue-400'
+                              }`}>{issue.severity}</span>
+                              <span className="text-muted-foreground">{issue.category}</span>
+                            </div>
+                            <p className="mb-1">{issue.description}</p>
+                            {issue.location && <p className="text-muted-foreground">📍 {issue.location}</p>}
+                          </div>
+                        ))}
+                        {msg.issues.length > 5 && (
+                          <p className="text-xs text-muted-foreground">+ {msg.issues.length - 5} more issues</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {msg.score && (
+                    <div className="mt-2 pt-2 border-t border-border/50">
+                      <p className="text-xs font-semibold mb-1">Quality Score:</p>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-muted-foreground">Quality:</span>
+                          <span className="ml-1 font-semibold">{msg.score.quality}/10</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Security:</span>
+                          <span className="ml-1 font-semibold">{msg.score.security}/10</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Performance:</span>
+                          <span className="ml-1 font-semibold">{msg.score.performance}/10</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Overall:</span>
+                          <span className="ml-1 font-semibold">{msg.score.overall}/10</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {msg.dependencies && msg.dependencies.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-border/50">
+                      <p className="text-xs font-semibold mb-1">New Dependencies:</p>
+                      <ul className="text-xs space-y-0.5">
+                        {msg.dependencies.map((dep, i) => (
+                          <li key={i}>📦 {dep}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {msg.next_steps && msg.next_steps.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-border/50">
+                      <p className="text-xs font-semibold mb-1 flex items-center gap-1">
+                        <Zap className="w-3 h-3" />
+                        Next Steps:
+                      </p>
+                      <ul className="text-xs space-y-0.5 list-disc list-inside">
+                        {msg.next_steps.map((step, i) => (
+                          <li key={i}>{step}</li>
+                        ))}
+                      </ul>
                     </div>
                   )}
                   {msg.files && (
@@ -287,11 +372,6 @@ export function AIAssistant({ onApplyChanges, files, userId, currentFile, curren
                           </li>
                         ))}
                       </ul>
-                    </div>
-                  )}
-                  {msg.isDemo && (
-                    <div className="mt-2 text-xs bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 p-2 rounded">
-                      Demo mode - Add ANTHROPIC_API_KEY for AI generation
                     </div>
                   )}
                 </div>
