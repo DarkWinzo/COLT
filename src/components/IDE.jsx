@@ -456,6 +456,8 @@ export function IDE({ user, isGuest, onLogout, initialProject }) {
         onApplyChanges={handleAIApplyChanges}
         files={files}
         userId={user?.id}
+        currentFile={selectedFile}
+        currentCode={files[selectedFile] || ''}
       />
       <ErrorPanel errors={errors} onClear={() => setErrors([])} />
     </div>
