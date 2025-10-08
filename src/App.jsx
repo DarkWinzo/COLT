@@ -20,22 +20,29 @@ function App() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user || null);
-      setLoading(false);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user || null);
+        setLoading(false);
 
-      const urlParams = new URLSearchParams(window.location.search);
-      const shareToken = urlParams.get('share');
+        const urlParams = new URLSearchParams(window.location.search);
+        const shareToken = urlParams.get('share');
 
-      if (shareToken) {
-        await loadSharedProject(shareToken);
+        if (shareToken) {
+          await loadSharedProject(shareToken);
+        }
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        setLoading(false);
       }
     };
 
     checkAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
+      (async () => {
+        setUser(session?.user || null);
+      })();
     });
 
     return () => subscription.unsubscribe();
