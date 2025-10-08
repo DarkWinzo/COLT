@@ -10,6 +10,8 @@ import { Button } from './components/ui/button';
 import { Plus, FolderOpen, Code2 } from 'lucide-react';
 
 function App() {
+  console.log('App component rendering...');
+
   const [user, setUser] = useState(null);
   const [isGuest, setIsGuest] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -17,6 +19,8 @@ function App() {
   const [currentProject, setCurrentProject] = useState(null);
   const [showNewProject, setShowNewProject] = useState(false);
   const { toast } = useToast();
+
+  console.log('App state:', { user: !!user, isGuest, loading, hasProject: !!currentProject });
 
   useEffect(() => {
     const checkAuth = async () => {
